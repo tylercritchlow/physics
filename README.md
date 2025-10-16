@@ -1,3 +1,8 @@
+Goals of this project:
+
+- In the end, I should have a collection of 20-40 demos of the engine, not including "stress tests". i.e. only cool demos.
+- bevy_ecs as the only library dependency, should build my own vector math functions, etc.
+
 Blog Series: Building a 3D Physics Engine From Scratch
 
 # Part 1: Rigid Body Dynamics

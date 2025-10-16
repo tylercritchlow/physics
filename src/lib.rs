@@ -1,14 +1,7 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+pub mod body;
+pub mod physics_loop;
+pub mod vector;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub use body::RigidBody;
+pub use physics_loop::PhysicsWorld;
+pub use vector::Vec3;

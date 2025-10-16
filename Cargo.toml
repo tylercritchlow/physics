@@ -3,5 +3,5 @@ name = "physics"
 version = "0.1.0"
 edition = "2024"
 
-[dependencies]
-bevy_ecs = "0.17.2"
+[dev-dependencies]
+blue_engine = "0.9.4"
