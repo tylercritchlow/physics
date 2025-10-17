@@ -1,3 +1,4 @@
+use crate::collision::CollisionShape;
 use crate::vector::Vec3;
 
 pub struct RigidBody {
@@ -5,6 +6,7 @@ pub struct RigidBody {
     pub velocity: Vec3,
     pub acceleration: Vec3,
     pub mass: f32,
+    pub shape: CollisionShape,
     force_accumulator: Vec3,
 }
 
@@ -15,6 +17,7 @@ impl RigidBody {
             velocity: Vec3::zero(),
             acceleration: Vec3::zero(),
             mass: 1.0,
+            shape: CollisionShape::Sphere { radius: 0.5 },
             force_accumulator: Vec3::zero(),
         }
     }
@@ -25,6 +28,18 @@ impl RigidBody {
             velocity: Vec3::zero(),
             acceleration: Vec3::zero(),
             mass,
+            shape: CollisionShape::Sphere { radius: 0.5 },
+            force_accumulator: Vec3::zero(),
+        }
+    }
+
+    pub fn with_shape(position: Vec3, mass: f32, shape: CollisionShape) -> Self {
+        Self {
+            position,
+            velocity: Vec3::zero(),
+            acceleration: Vec3::zero(),
+            mass,
+            shape,
             force_accumulator: Vec3::zero(),
         }
     }

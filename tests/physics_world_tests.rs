@@ -127,16 +127,18 @@ fn test_physics_world_zero_delta_time() {
 fn test_physics_world_all_bodies_update() {
     let mut world = PhysicsWorld::new(1.0 / 60.0);
 
+    // Space bodies apart to avoid collisions (default sphere radius is 0.5, so use spacing > 1.0)
     for i in 0..5 {
-        let mut body = RigidBody::new(Vec3::zero());
-        body.velocity = Vec3::new(i as f32, 0.0, 0.0);
+        let mut body = RigidBody::new(Vec3::new(i as f32 * 2.0, 0.0, 0.0));
+        body.velocity = Vec3::new(1.0, 0.0, 0.0);
         world.add_body(body);
     }
 
     world.update(1.0);
 
     for (i, body) in world.bodies.iter().enumerate() {
-        assert!((body.position.x - i as f32).abs() < 0.0001);
+        let expected_x = i as f32 * 2.0 + 1.0; // initial + velocity * time
+        assert!((body.position.x - expected_x).abs() < 0.0001);
     }
 }
 
