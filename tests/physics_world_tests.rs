@@ -1,4 +1,4 @@
-use physics::{PhysicsWorld, RigidBody, Vec3};
+use physics::{Body, PhysicsWorld, RigidBody, Vec3};
 
 #[test]
 fn test_physics_world_creation() {
@@ -11,9 +11,9 @@ fn test_physics_world_add_body() {
     let mut world = PhysicsWorld::new(1.0 / 60.0);
     let body = RigidBody::new(Vec3::new(1.0, 2.0, 3.0));
 
-    world.add_body(body);
+    world.add_body(Body::Rigid(body)); // Wrapped RigidBody
     assert_eq!(world.bodies.len(), 1);
-    assert_eq!(world.bodies[0].position.x, 1.0);
+    assert_eq!(world.bodies[0].position().x, 1.0); // Used position() method
 }
 
 #[test]
@@ -22,7 +22,7 @@ fn test_physics_world_add_multiple_bodies() {
 
     for i in 0..10 {
         let body = RigidBody::new(Vec3::new(i as f32, 0.0, 0.0));
-        world.add_body(body);
+        world.add_body(Body::Rigid(body)); // Wrapped RigidBody
     }
 
     assert_eq!(world.bodies.len(), 10);
@@ -33,12 +33,12 @@ fn test_physics_world_fixed_timestep_update() {
     let mut world = PhysicsWorld::new(1.0 / 60.0);
     let mut body = RigidBody::new(Vec3::zero());
     body.velocity = Vec3::new(1.0, 0.0, 0.0);
-    world.add_body(body);
+    world.add_body(Body::Rigid(body)); // Wrapped RigidBody
 
     let dt = 1.0 / 60.0;
     world.update(dt);
 
-    assert!((world.bodies[0].position.x - (1.0 / 60.0)).abs() < 0.0001);
+    assert!((world.bodies[0].position().x - (1.0 / 60.0)).abs() < 0.0001);
 }
 
 #[test]
@@ -46,16 +46,16 @@ fn test_physics_world_accumulator() {
     let mut world = PhysicsWorld::new(1.0 / 60.0);
     let mut body = RigidBody::new(Vec3::zero());
     body.velocity = Vec3::new(60.0, 0.0, 0.0);
-    world.add_body(body);
+    world.add_body(Body::Rigid(body)); // Wrapped RigidBody
 
     let small_dt = 1.0 / 120.0;
     world.update(small_dt);
 
-    assert_eq!(world.bodies[0].position.x, 0.0);
+    assert_eq!(world.bodies[0].position().x, 0.0);
 
     world.update(small_dt);
 
-    assert!((world.bodies[0].position.x - 1.0).abs() < 0.0001);
+    assert!((world.bodies[0].position().x - 1.0).abs() < 0.0001);
 }
 
 #[test]
@@ -63,12 +63,12 @@ fn test_physics_world_multiple_fixed_steps_per_frame() {
     let mut world = PhysicsWorld::new(1.0 / 60.0);
     let mut body = RigidBody::new(Vec3::zero());
     body.velocity = Vec3::new(60.0, 0.0, 0.0);
-    world.add_body(body);
+    world.add_body(Body::Rigid(body)); // Wrapped RigidBody
 
     let large_dt = 3.0 / 60.0;
     world.update(large_dt);
 
-    assert!((world.bodies[0].position.x - 3.0).abs() < 0.0001);
+    assert!((world.bodies[0].position().x - 3.0).abs() < 0.0001);
 }
 
 #[test]
@@ -76,21 +76,21 @@ fn test_physics_world_determinism() {
     let mut world1 = PhysicsWorld::new(1.0 / 60.0);
     let mut body1 = RigidBody::new(Vec3::zero());
     body1.velocity = Vec3::new(1.0, 2.0, 3.0);
-    world1.add_body(body1);
+    world1.add_body(Body::Rigid(body1)); // Wrapped RigidBody
 
     let mut world2 = PhysicsWorld::new(1.0 / 60.0);
     let mut body2 = RigidBody::new(Vec3::zero());
     body2.velocity = Vec3::new(1.0, 2.0, 3.0);
-    world2.add_body(body2);
+    world2.add_body(Body::Rigid(body2)); // Wrapped RigidBody
 
     for _ in 0..100 {
         world1.update(1.0 / 60.0);
         world2.update(1.0 / 60.0);
     }
 
-    assert_eq!(world1.bodies[0].position.x, world2.bodies[0].position.x);
-    assert_eq!(world1.bodies[0].position.y, world2.bodies[0].position.y);
-    assert_eq!(world1.bodies[0].position.z, world2.bodies[0].position.z);
+    assert_eq!(world1.bodies[0].position().x, world2.bodies[0].position().x);
+    assert_eq!(world1.bodies[0].position().y, world2.bodies[0].position().y);
+    assert_eq!(world1.bodies[0].position().z, world2.bodies[0].position().z);
 }
 
 #[test]
@@ -98,7 +98,7 @@ fn test_physics_world_variable_timestep_stability() {
     let mut world = PhysicsWorld::new(1.0 / 60.0);
     let mut body = RigidBody::new(Vec3::zero());
     body.velocity = Vec3::new(1.0, 0.0, 0.0);
-    world.add_body(body);
+    world.add_body(Body::Rigid(body)); // Wrapped RigidBody
 
     world.update(1.0 / 30.0);
     world.update(1.0 / 120.0);
@@ -108,7 +108,7 @@ fn test_physics_world_variable_timestep_stability() {
     let total_time = 1.0 / 30.0 + 1.0 / 120.0 + 1.0 / 45.0 + 1.0 / 90.0;
     let expected_position = total_time;
 
-    assert!((world.bodies[0].position.x - expected_position).abs() < 0.01);
+    assert!((world.bodies[0].position().x - expected_position).abs() < 0.01);
 }
 
 #[test]
@@ -116,11 +116,11 @@ fn test_physics_world_zero_delta_time() {
     let mut world = PhysicsWorld::new(1.0 / 60.0);
     let mut body = RigidBody::new(Vec3::zero());
     body.velocity = Vec3::new(1.0, 0.0, 0.0);
-    world.add_body(body);
+    world.add_body(Body::Rigid(body)); // Wrapped RigidBody
 
     world.update(0.0);
 
-    assert_eq!(world.bodies[0].position.x, 0.0);
+    assert_eq!(world.bodies[0].position().x, 0.0);
 }
 
 #[test]
@@ -131,14 +131,14 @@ fn test_physics_world_all_bodies_update() {
     for i in 0..5 {
         let mut body = RigidBody::new(Vec3::new(i as f32 * 2.0, 0.0, 0.0));
         body.velocity = Vec3::new(1.0, 0.0, 0.0);
-        world.add_body(body);
+        world.add_body(Body::Rigid(body)); // Wrapped RigidBody
     }
 
     world.update(1.0);
 
     for (i, body) in world.bodies.iter().enumerate() {
         let expected_x = i as f32 * 2.0 + 1.0; // initial + velocity * time
-        assert!((body.position.x - expected_x).abs() < 0.0001);
+        assert!((body.position().x - expected_x).abs() < 0.0001);
     }
 }
 
@@ -160,7 +160,7 @@ fn test_physics_world_custom_gravity() {
 fn test_physics_world_applies_gravity() {
     let mut world = PhysicsWorld::new(1.0 / 60.0);
     let body = RigidBody::with_mass(Vec3::new(0.0, 100.0, 0.0), 2.0);
-    world.add_body(body);
+    world.add_body(Body::Rigid(body)); // Wrapped RigidBody
 
     // Update for 1 second
     world.update(1.0);
@@ -168,8 +168,8 @@ fn test_physics_world_applies_gravity() {
     // Gravity force = mass * gravity = 2.0 * -9.8 = -19.6
     // Acceleration = force / mass = -19.6 / 2.0 = -9.8
     // Semi-implicit Euler: v = -9.8, position = 100 - 0.5*9.8*1^2 ≈ 95.1
-    assert!((world.bodies[0].velocity.y - (-9.8)).abs() < 0.01);
-    assert!((world.bodies[0].position.y - 95.1).abs() < 0.1);
+    assert!((world.bodies[0].as_rigid_body().unwrap().velocity.y - (-9.8)).abs() < 0.01); // Used as_rigid_body().unwrap().velocity
+    assert!((world.bodies[0].position().y - 95.1).abs() < 0.1); // Used position() method
 }
 
 #[test]
@@ -177,16 +177,17 @@ fn test_physics_world_gravity_affects_all_bodies() {
     let mut world = PhysicsWorld::new(1.0 / 60.0);
 
     // Add bodies with different masses
-    world.add_body(RigidBody::with_mass(Vec3::new(0.0, 100.0, 0.0), 1.0));
-    world.add_body(RigidBody::with_mass(Vec3::new(0.0, 100.0, 0.0), 5.0));
-    world.add_body(RigidBody::with_mass(Vec3::new(0.0, 100.0, 0.0), 10.0));
+    world.add_body(Body::Rigid(RigidBody::with_mass(Vec3::new(0.0, 100.0, 0.0), 1.0))); // Wrapped RigidBody
+    world.add_body(Body::Rigid(RigidBody::with_mass(Vec3::new(0.0, 100.0, 0.0), 5.0))); // Wrapped RigidBody
+    world.add_body(Body::Rigid(RigidBody::with_mass(Vec3::new(0.0, 100.0, 0.0), 10.0))); // Wrapped RigidBody
 
     world.update(1.0);
 
     // All bodies should fall at the same rate (a = g = -9.8) regardless of mass
     for body in &world.bodies {
-        assert!((body.acceleration.y - (-9.8)).abs() < 0.0001);
-        assert!((body.velocity.y - (-9.8)).abs() < 0.01);
+        let rigid_body = body.as_rigid_body().unwrap(); // Get RigidBody
+        assert!((rigid_body.acceleration.y - (-9.8)).abs() < 0.0001); // Used rigid_body.acceleration
+        assert!((rigid_body.velocity.y - (-9.8)).abs() < 0.01); // Used rigid_body.velocity
     }
 }
 
@@ -194,20 +195,20 @@ fn test_physics_world_gravity_affects_all_bodies() {
 fn test_physics_world_no_gravity() {
     let mut world = PhysicsWorld::with_gravity(1.0 / 60.0, Vec3::zero());
     let body = RigidBody::new(Vec3::new(0.0, 100.0, 0.0));
-    world.add_body(body);
+    world.add_body(Body::Rigid(body)); // Wrapped RigidBody
 
     world.update(1.0);
 
     // No gravity, body should stay at same height
-    assert_eq!(world.bodies[0].position.y, 100.0);
-    assert_eq!(world.bodies[0].velocity.y, 0.0);
+    assert_eq!(world.bodies[0].position().y, 100.0);
+    assert_eq!(world.bodies[0].as_rigid_body().unwrap().velocity.y, 0.0);
 }
 
 #[test]
 fn test_physics_world_falling_simulation() {
     let mut world = PhysicsWorld::new(0.01); // 100 Hz
     let body = RigidBody::with_mass(Vec3::new(0.0, 100.0, 0.0), 1.0);
-    world.add_body(body);
+    world.add_body(Body::Rigid(body)); // Wrapped RigidBody
 
     // Simulate falling for 3 seconds
     for _ in 0..300 {
@@ -217,8 +218,8 @@ fn test_physics_world_falling_simulation() {
     // After 3 seconds of free fall from 100m with g = -9.8:
     // v = gt = -9.8 * 3 = -29.4
     // y = y0 + 0.5*g*t^2 = 100 + 0.5*(-9.8)*9 = 100 - 44.1 = 55.9
-    assert!((world.bodies[0].velocity.y - (-29.4)).abs() < 0.5);
-    assert!((world.bodies[0].position.y - 55.9).abs() < 2.0);
+    assert!((world.bodies[0].as_rigid_body().unwrap().velocity.y - (-29.4)).abs() < 0.5);
+    assert!((world.bodies[0].position().y - 55.9).abs() < 2.0);
 }
 
 #[test]
@@ -226,10 +227,10 @@ fn test_physics_world_gravity_with_initial_velocity() {
     let mut world = PhysicsWorld::new(1.0 / 60.0);
     let mut body = RigidBody::new(Vec3::zero());
     body.velocity = Vec3::new(0.0, 50.0, 0.0); // Throw upward
-    world.add_body(body);
+    world.add_body(Body::Rigid(body)); // Wrapped RigidBody
 
     world.update(1.0);
 
     // After 1 second: v = v0 + at = 50 + (-9.8)*1 = 40.2
-    assert!((world.bodies[0].velocity.y - 40.2).abs() < 0.1);
+    assert!((world.bodies[0].as_rigid_body().unwrap().velocity.y - 40.2).abs() < 0.1);
 }
