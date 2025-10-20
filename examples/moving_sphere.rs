@@ -57,6 +57,7 @@ fn physics_update(mut physics_world: ResMut<OurPhysicsWorld>, mut query: Query<(
 
 fn main() {
     let mut physics_world = PhysicsWorld::new(1.0 / 60.0);
+
     let mut sphere_body = RigidBody::new(Vec3::new(0.0, 0.0, 0.0));
     sphere_body.velocity = Vec3::new(1.0, 0.5, 0.0);
     physics_world.add_body(Body::Rigid(sphere_body)); // Wrap RigidBody in Body::Rigid

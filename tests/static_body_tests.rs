@@ -34,6 +34,7 @@ fn test_rigid_static_collision_response() {
     let mut world = PhysicsWorld::new(fixed_timestep);
     world.gravity = Vec3::new(0.0, -9.8, 0.0);
     world.restitution = 0.1;
+    world.friction = 0.8; // Increased friction for this test
 
     // Static sphere at the bottom
     let static_pos = Vec3::new(0.0, 0.0, 0.0);
@@ -42,7 +43,7 @@ fn test_rigid_static_collision_response() {
     world.add_body(Body::Static(static_body));
 
     // Dynamic sphere dropped from above
-    let dynamic_initial_pos = Vec3::new(0.0, 1.0, 0.0);
+    let dynamic_initial_pos = Vec3::new(0.0, 1.001, 0.0);
     let dynamic_radius = 0.5;
     let mut dynamic_rb = RigidBody::new(dynamic_initial_pos);
     dynamic_rb.shape = CollisionShape::Sphere { radius: dynamic_radius };
@@ -51,8 +52,11 @@ fn test_rigid_static_collision_response() {
 
     // Simulate until collision and settling
     let num_steps = 200; // Enough steps for it to fall and settle
-    for _ in 0..num_steps {
+    for step in 0..num_steps {
         world.update(fixed_timestep);
+        let dynamic_pos = world.bodies[1].position();
+        let dynamic_vel = world.bodies[1].as_rigid_body().unwrap().velocity;
+        println!("[DEBUG TEST] Step {}: Pos={:?}, Vel={:?}", step, dynamic_pos, dynamic_vel);
     }
 
     // Assert static body has not moved
@@ -72,6 +76,7 @@ fn test_rigid_static_collision_response() {
 fn test_static_static_no_interaction() {
     let fixed_timestep = 1.0 / 60.0;
     let mut world = PhysicsWorld::new(fixed_timestep);
+    world.friction = 0.5; // Explicitly set friction for this test
 
     let static_pos1 = Vec3::new(0.0, 0.0, 0.0);
     let static_pos2 = Vec3::new(0.0, 0.5, 0.0); // Overlapping

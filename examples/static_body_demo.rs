@@ -2,9 +2,11 @@ use bevy::prelude::*;
 use bevy::math::Vec3 as BevyVec3;
 use physics::{Body, PhysicsWorld, RigidBody, StaticBody, Vec3, CollisionShape};
 
+// Bevy resource to hold our physics world
 #[derive(Resource)]
 struct OurPhysicsWorld(PhysicsWorld);
 
+// Bevy component to link a Bevy entity to a physics rigid body
 #[derive(Component)]
 struct PhysicsBodyId(usize);
 
@@ -35,23 +37,24 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
             transform: Transform::from_xyz(0.0, 0.0, 0.0),
             ..default()
         },
-        PhysicsBodyId(0),
+        PhysicsBodyId(0), // Link to the static physics body
     ));
 
     commands.spawn(
         (PbrBundle {
             mesh: sphere_mesh,
             material: dynamic_material,
-            transform: Transform::from_xyz(0.0, 1.0, 0.0),
+            transform: Transform::from_xyz(0.0, 2.0, 0.0),
             ..default()
         },
-        PhysicsBodyId(1),
+        PhysicsBodyId(1), // Link to the dynamic physics body
     ));
 }
 
 fn physics_update(mut physics_world: ResMut<OurPhysicsWorld>, mut query: Query<(&PhysicsBodyId, &mut Transform)>) {
     physics_world.0.update(1.0 / 60.0);
 
+    // Update Bevy entity transforms based on physics simulation
     for (physics_body_id, mut transform) in query.iter_mut() {
         if let Some(body) = physics_world.0.bodies.get(physics_body_id.0) {
             transform.translation = BevyVec3::new(body.position().x, body.position().y, body.position().z);
@@ -60,14 +63,15 @@ fn physics_update(mut physics_world: ResMut<OurPhysicsWorld>, mut query: Query<(
 }
 
 fn main() {
-    let mut physics_world = PhysicsWorld::new(1.0 / 60.0);
-    physics_world.restitution = 0.1; // Reduced restitution
+    let mut physics_world = PhysicsWorld::new(1.0 / 60.0); // Fixed timestep
 
-    let static_sphere = StaticBody::new(Vec3::new(0.0, -2.0, 0.0), CollisionShape::Sphere { radius: 0.5 });
+    // Static sphere at the bottom
+    let static_sphere = StaticBody::new(Vec3::new(0.0, 0.0, 0.0), CollisionShape::Sphere { radius: 0.5 });
     physics_world.add_body(Body::Static(static_sphere));
 
-    let mut dynamic_sphere = RigidBody::new(Vec3::new(0.1, 4.0, 0.0));
-    dynamic_sphere.velocity = Vec3::new(0.0, 0.0, 0.0);
+    // Dynamic sphere dropped from above
+    let mut dynamic_sphere = RigidBody::new(Vec3::new(0.0, 2.0, 0.0)); // Original initial height
+    dynamic_sphere.velocity = Vec3::new(0.1, 0.0, 0.0);
     physics_world.add_body(Body::Rigid(dynamic_sphere));
 
     App::new()

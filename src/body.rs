@@ -1,25 +1,25 @@
 use crate::collision::CollisionShape;
 use crate::vector::Vec3;
 
-// StaticBody: Has position and shape for collision, but no movement properties.
 pub struct StaticBody {
     pub position: Vec3,
     pub shape: CollisionShape,
+    pub friction: f32,
 }
 
 impl StaticBody {
     pub fn new(position: Vec3, shape: CollisionShape) -> Self {
-        Self { position, shape }
+        Self { position, shape, friction: 0.25 }
     }
 }
 
-// RigidBody: Dynamic body with mass, velocity, and acceleration.
 pub struct RigidBody {
     pub position: Vec3,
     pub velocity: Vec3,
     pub acceleration: Vec3,
     pub mass: f32,
     pub shape: CollisionShape,
+    pub friction: f32,
     force_accumulator: Vec3,
 }
 
@@ -31,6 +31,7 @@ impl RigidBody {
             acceleration: Vec3::zero(),
             mass: 1.0,
             shape: CollisionShape::Sphere { radius: 0.5 },
+            friction: 0.25,
             force_accumulator: Vec3::zero(),
         }
     }
@@ -42,6 +43,7 @@ impl RigidBody {
             acceleration: Vec3::zero(),
             mass,
             shape: CollisionShape::Sphere { radius: 0.5 },
+            friction: 0.25,
             force_accumulator: Vec3::zero(),
         }
     }
@@ -53,6 +55,7 @@ impl RigidBody {
             acceleration: Vec3::zero(),
             mass,
             shape,
+            friction: 0.25,
             force_accumulator: Vec3::zero(),
         }
     }
@@ -65,26 +68,32 @@ impl RigidBody {
         self.force_accumulator = Vec3::zero();
     }
 
-    pub fn update(&mut self, dt: f32) {
+    // New method: Integrates velocity based on acceleration
+    pub fn integrate_velocity(&mut self, dt: f32) {
         if self.mass > 0.0 {
             self.acceleration = self.force_accumulator * (1.0 / self.mass);
         }
-
         self.velocity += self.acceleration * dt;
-        self.position += self.velocity * dt;
+    }
 
+    // New method: Integrates position based on velocity
+    pub fn integrate_position(&mut self, dt: f32) {
+        self.position += self.velocity * dt;
+    }
+
+    pub fn update(&mut self, dt: f32) {
+        self.integrate_velocity(dt);
+        self.integrate_position(dt);
         self.clear_forces();
     }
 }
 
-// Body enum: Represents either a dynamic RigidBody or a static StaticBody.
 pub enum Body {
     Rigid(RigidBody),
     Static(StaticBody),
 }
 
 impl Body {
-    // Helper to get mutable RigidBody if it's a Rigid variant
     pub fn as_rigid_body_mut(&mut self) -> Option<&mut RigidBody> {
         match self {
             Body::Rigid(body) => Some(body),
@@ -92,7 +101,6 @@ impl Body {
         }
     }
 
-    // Helper to get immutable RigidBody if it's a Rigid variant
     pub fn as_rigid_body(&self) -> Option<&RigidBody> {
         match self {
             Body::Rigid(body) => Some(body),
@@ -100,7 +108,6 @@ impl Body {
         }
     }
 
-    // Helper to get mutable StaticBody if it's a Static variant
     pub fn as_static_body_mut(&mut self) -> Option<&mut StaticBody> {
         match self {
             Body::Static(body) => Some(body),
@@ -108,7 +115,6 @@ impl Body {
         }
     }
 
-    // Helper to get immutable StaticBody if it's a Static variant
     pub fn as_static_body(&self) -> Option<&StaticBody> {
         match self {
             Body::Static(body) => Some(body),
@@ -116,7 +122,6 @@ impl Body {
         }
     }
 
-    // Common accessors for position and shape
     pub fn position(&self) -> &Vec3 {
         match self {
             Body::Rigid(body) => &body.position,
@@ -131,10 +136,10 @@ impl Body {
         }
     }
 
-    // Update only if it's a RigidBody
-    pub fn update(&mut self, dt: f32) {
-        if let Body::Rigid(body) = self {
-            body.update(dt);
+    pub fn friction(&self) -> f32 {
+        match self {
+            Body::Rigid(body) => body.friction,
+            Body::Static(body) => body.friction,
         }
     }
 }

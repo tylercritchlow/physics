@@ -85,7 +85,6 @@ fn physics_update(mut physics_world: ResMut<OurPhysicsWorld>, mut query: Query<(
 
 fn main() {
     let mut physics_world = PhysicsWorld::new(1.0 / 60.0);
-    physics_world.gravity = Vec3::new(0.0, -9.8, 0.0); // Default gravity
 
     // Create three spheres with different masses
     let light_sphere = RigidBody::with_mass(Vec3::new(-2.0, 5.0, 0.0), 0.5);

@@ -1,5 +1,5 @@
 use crate::body::Body;
-use crate::collision::{sphere_vs_sphere, CollisionShape, CollisionInfo};
+use crate::collision::{sphere_vs_plane, CollisionInfo, CollisionShape, sphere_vs_sphere, sphere_vs_aabb, aabb_vs_aabb};
 use crate::vector::Vec3;
 
 pub struct PhysicsWorld {
@@ -8,6 +8,7 @@ pub struct PhysicsWorld {
     fixed_timestep: f32,
     pub gravity: Vec3,
     pub restitution: f32,
+    pub friction: f32,
 }
 
 impl PhysicsWorld {
@@ -18,6 +19,7 @@ impl PhysicsWorld {
             fixed_timestep,
             gravity: Vec3::new(0.0, -9.8, 0.0),
             restitution: 0.5,
+            friction: 0.25,
         }
     }
 
@@ -28,6 +30,7 @@ impl PhysicsWorld {
             fixed_timestep,
             gravity,
             restitution: 0.5,
+            friction: 0.25,
         }
     }
 
@@ -74,12 +77,40 @@ impl PhysicsWorld {
                     (
                         CollisionShape::Sphere { radius: r1 },
                         CollisionShape::Sphere { radius: r2 },
-                    ) => sphere_vs_sphere(
-                        *body_i.position(),
-                        *r1,
-                        *body_j.position(),
-                        *r2,
-                    ),
+                    ) => sphere_vs_sphere(*body_i.position(), *r1, *body_j.position(), *r2),
+                    (
+                        CollisionShape::Sphere { radius },
+                        CollisionShape::Plane { normal, distance },
+                    ) => sphere_vs_plane(*body_i.position(), *radius, *normal, *distance),
+                    (
+                        CollisionShape::Plane { normal, distance },
+                        CollisionShape::Sphere { radius },
+                    ) => {
+                        let mut info =
+                            sphere_vs_plane(*body_j.position(), *radius, *normal, *distance);
+                        if info.is_colliding {
+                            info.normal = -info.normal;
+                        }
+                        info
+                    }
+                    (
+                        CollisionShape::Sphere { radius },
+                        CollisionShape::AABB { min, max },
+                    ) => sphere_vs_aabb(*body_i.position(), *radius, *min, *max),
+                    (
+                        CollisionShape::AABB { min, max },
+                        CollisionShape::Sphere { radius },
+                    ) => {
+                        let mut info = sphere_vs_aabb(*body_j.position(), *radius, *min, *max);
+                        if info.is_colliding {
+                            info.normal = -info.normal;
+                        }
+                        info
+                    }
+                    (
+                        CollisionShape::AABB { min: min1, max: max1 },
+                        CollisionShape::AABB { min: min2, max: max2 },
+                    ) => aabb_vs_aabb(*min1, *max1, *min2, *max2),
                     _ => continue,
                 };
 
@@ -95,7 +126,6 @@ impl PhysicsWorld {
         // Apply resolutions
         for (i, j, collision_info) in collisions_to_resolve {
             // Get mutable references to the bodies using split_at_mut
-            // This ensures we have two distinct mutable references
             let (body1, body2) = if i < j {
                 let (left, right) = self.bodies.split_at_mut(j);
                 (&mut left[i], &mut right[0])
@@ -114,13 +144,14 @@ impl PhysicsWorld {
             let mass_i = body1.as_rigid_body().map_or(f32::INFINITY, |b| b.mass);
             let mass_j = body2.as_rigid_body().map_or(f32::INFINITY, |b| b.mass);
 
+            let friction_i = body1.friction();
+            let friction_j = body2.friction();
+
             // Now get mutable RigidBody options
-            // We need to get these *after* all immutable data is extracted
-            // and use them carefully to avoid moving the Option
             let mut rigid_body_i_option = body1.as_rigid_body_mut();
             let mut rigid_body_j_option = body2.as_rigid_body_mut();
 
-            // If both are static, no resolution needed (already filtered, but good to double check)
+            // If both are static, no resolution needed
             if rigid_body_i_option.is_none() && rigid_body_j_option.is_none() {
                 continue;
             }
@@ -149,22 +180,68 @@ impl PhysicsWorld {
             let relative_velocity = vel_i_initial - vel_j_initial;
             let velocity_along_normal = relative_velocity.dot(&collision_info.normal);
 
-            // If bodies are separating (velocity_along_normal < 0), skip
+            // If bodies are separating (velocity_along_normal < 0), skip impulse resolution.
             if velocity_along_normal < 0.0 {
                 continue;
             }
 
-            // Calculate impulse
+            // Calculate normal impulse (with Baumgarte stabilization for penetration)
             let e = self.restitution;
-            let impulse_magnitude = -(1.0 + e) * velocity_along_normal / (1.0 / mass_i + 1.0 / mass_j);
-            let impulse = collision_info.normal * impulse_magnitude;
+            const PENETRATION_BIAS: f32 = 0.2;
+            let impulse_magnitude_normal = (-(1.0 + e) * velocity_along_normal
+                - PENETRATION_BIAS * collision_info.penetration_depth / self.fixed_timestep)
+                / (1.0 / mass_i + 1.0 / mass_j);
+            let normal_impulse = collision_info.normal * impulse_magnitude_normal;
 
-            // Apply impulse
+            // Apply normal impulse
             if let Some(rb_i) = rigid_body_i_option.as_mut() {
-                rb_i.velocity = vel_i_initial + impulse * (1.0 / mass_i);
+                rb_i.velocity = vel_i_initial + normal_impulse * (1.0 / mass_i);
             }
             if let Some(rb_j) = rigid_body_j_option.as_mut() {
-                rb_j.velocity = vel_j_initial - impulse * (1.0 / mass_j);
+                rb_j.velocity = vel_j_initial - normal_impulse * (1.0 / mass_j);
+            }
+
+            // --- Friction Calculation ---
+            let combined_friction = (friction_i + friction_j) * 0.5; // Average friction
+
+            // Recalculate relative velocity after normal impulse
+            let current_vel_i = rigid_body_i_option
+                .as_ref()
+                .map_or(vel_i_initial, |b| b.velocity);
+            let current_vel_j = rigid_body_j_option
+                .as_ref()
+                .map_or(vel_j_initial, |b| b.velocity);
+            let relative_velocity_after_normal = current_vel_i - current_vel_j;
+
+            // Calculate tangential velocity
+            let tangent_direction = relative_velocity_after_normal
+                - collision_info.normal
+                    * relative_velocity_after_normal.dot(&collision_info.normal);
+            let tangent_magnitude = tangent_direction.magnitude();
+
+            if tangent_magnitude > f32::EPSILON {
+                // Avoid division by zero
+                let unit_tangent = tangent_direction.normalize();
+
+                // Calculate tangential impulse magnitude
+                let impulse_magnitude_tangent = -relative_velocity_after_normal.dot(&unit_tangent)
+                    / (1.0 / mass_i + 1.0 / mass_j);
+
+                // Apply Coulomb's friction model
+                let friction_impulse_magnitude = impulse_magnitude_tangent.clamp(
+                    -impulse_magnitude_normal.abs() * combined_friction,
+                    impulse_magnitude_normal.abs() * combined_friction,
+                );
+
+                let friction_impulse = unit_tangent * friction_impulse_magnitude;
+
+                // Apply friction impulse
+                if let Some(rb_i) = rigid_body_i_option.as_mut() {
+                    rb_i.velocity += friction_impulse * (1.0 / mass_i);
+                }
+                if let Some(rb_j) = rigid_body_j_option.as_mut() {
+                    rb_j.velocity -= friction_impulse * (1.0 / mass_j);
+                }
             }
         }
     }
